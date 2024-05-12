@@ -3,32 +3,41 @@
 
 mod tasks {
     pub mod heartbeat;
+    // pub mod accelerometer;
 }
+use tasks::heartbeat::{HeartBeat, heartbeat_task};
 
-use defmt::*;
+mod utils {
+    pub mod button_mon;
+}
+use utils::button_mon::{ButtonMon, button_task};
+
 use embassy_executor::Spawner;
-use embassy_stm32::exti::ExtiInput;
-use embassy_stm32::gpio::{Input, Level, Output, Pin, Pull, Speed};
-use embassy_time::{Duration, Timer};
+use embassy_stm32::exti::Channel;
+use embassy_stm32::gpio::Pin;
 use panic_halt as _;
-use tasks::heartbeat::heartbeat;
 
 #[embassy_executor::main]
-async fn main(spawner: Spawner) -> ! {
+async fn main(spawner: Spawner) {
+    // Initialize the peripherals
     let p = embassy_stm32::init(Default::default());
-    let heartbeat_pin = p.PD14.degrade();
-    let other_pin = p.PD12.degrade();
 
-    spawner.spawn(heartbeat(heartbeat_pin, 1000)).unwrap();
-    let button = Input::new(p.PA0, Pull::None);
-    let mut button = ExtiInput::new(button, p.EXTI0);
-    let mut led = Output::new(other_pin, Level::Low, Speed::Low);
+    // Set up a heartbeat LED to we know we're still working
+    let heartbeat_pin = p.PD14.degrade(); // green LED
+    let heart = HeartBeat::init(heartbeat_pin, 1000);
+    spawner.spawn(heartbeat_task(heart)).unwrap();
 
-    loop {
-        // Check if button got pressed
-        button.wait_for_rising_edge().await;
-        led.toggle();
-        info!("{:?} button press detected!", file!());
-        Timer::after(Duration::from_millis(250)).await;
-    }
+    // Set up a button to have a blink and log message
+
+    // Select which pins are used
+    let led= p.PD12.degrade(); // red LED
+    let button_pin = p.PA0.degrade();
+    let int= p.EXTI0.degrade();
+    // Configure the button monitor
+    let button_monitor = ButtonMon::init(led, button_pin, int);
+    // Start the button monitoring task
+    spawner.spawn(button_task(button_monitor)).unwrap();
+
+    // Set up communication to the accelerometer
+
 }
