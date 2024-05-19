@@ -3,6 +3,7 @@
 linker = "flip-link"
 runner = ["probe-rs", "run", "--chip", "STM32F407VGTx", "--log-format", "{L} {s}"]
 
+
 rustflags = [
   # Previously, the linker arguments --nmagic and -Tlink.x were set here.
   # They are now set by build.rs instead. The linker argument can still
@@ -27,3 +28,6 @@ rustflags = [
 
 [build]
 target = "thumbv7em-none-eabihf"     # Cortex-M4F and Cortex-M7F (with FPU)
+[env]
+DEFMT_LOG="trace"
+# DEFMT_LOG="error"

@@ -40,4 +40,7 @@ fn main() {
 
     // Set the linker script to the one provided by cortex-m-rt.
     println!("cargo:rustc-link-arg=-Tlink.x");
+
+    // Defmt linker to enable RTT logs
+    println!("cargo:rustc-link-arg=-Tdefmt.x");
 }
