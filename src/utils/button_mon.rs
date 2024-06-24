@@ -16,7 +16,6 @@ impl ButtonMon<'_> {
             led, ext
         }
     }
-
 }
 
 #[embassy_executor::task]

@@ -1,5 +1,4 @@
 [target.thumbv7em-none-eabihf]
-# runner = "probe-rs run --chip STM32F407VGTx"
 linker = "flip-link"
 runner = ["probe-rs", "run", "--chip", "STM32F407VGTx", "--log-format", "{L} {s}"]
 
@@ -9,9 +8,11 @@ rustflags = [
   # They are now set by build.rs instead. The linker argument can still
   # only be set here, if a custom linker is needed.
   # See https://github.com/rust-embedded/cortex-m-quickstart/pull/95
+  # This is done in the build.rs file now
   # "-C", "link-arg=--nmagic",
 
   # # # # LLD (shipped with the Rust toolchain) is used as the default linker
+  # This is done in the build.rs file now
   # "-C", "link-arg=-Tlink.x",
 
   # By default, the LLD linker is used, which is shipped with the Rust
@@ -28,6 +29,7 @@ rustflags = [
 
 [build]
 target = "thumbv7em-none-eabihf"     # Cortex-M4F and Cortex-M7F (with FPU)
+
 [env]
 DEFMT_LOG="trace"
 # DEFMT_LOG="error"
