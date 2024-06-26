@@ -6,7 +6,7 @@ mod utils;
 mod modules;
 
 // use tasks::accelerometer::{AccelMon, accel_task};
-use tasks::accelerometer::{accel_task, AccelError};
+// use tasks::accelerometer::{accel_task, AccelError};
 use tasks::heartbeat::{HeartBeat, heartbeat_task};
 use modules::lis302dl;
 
@@ -14,7 +14,7 @@ use utils::button_mon::{ButtonMon, button_task};
 
 use embassy_executor::Spawner;
 use static_cell::StaticCell;
-use embassy_embedded_hal::shared_bus::spi::SpiDevice;
+use embassy_embedded_hal::shared_bus::asynch::spi::SpiDevice;
 use embassy_sync::mutex::Mutex;
 use embassy_sync::blocking_mutex::raw::NoopRawMutex;
 use embassy_stm32::exti::Channel;
@@ -57,11 +57,13 @@ async fn main(spawner: Spawner) {
     spi_config.frequency = Hertz(1_000_000);
     let spi= Spi::new(p.SPI1, p.PA5 ,p.PA7 ,p.PA6 ,p.DMA2_CH3 ,p.DMA2_CH2 , spi_config);
     let mut chip_select = Output::new(p.PE3, Level::High, Speed::High);
+    chip_select.set_high();
     let spi_bus = Mutex::new(spi);
     let spi_bus = SPI_BUS.init(spi_bus);
     let spi_dev1 = SpiDevice::new(spi_bus, chip_select);
     let config = lis302dl::Config::default();
     let mut accel_mon = lis302dl::Lis302Dl::new(spi_dev1, config);
-    spawner.spawn(accel_task(accel_mon)).unwrap();
+    let _ = accel_mon.init().await;
+    // spawner.spawn(accel_task(accel_mon)).unwrap();
 }
     

@@ -1,15 +1,15 @@
-use defmt::*;
-// use embassy_embedded_hal::shared_bus::asynch::spi::SpiDevice;
-use embassy_embedded_hal;
+// use defmt::*;
+// // use embassy_embedded_hal::shared_bus::asynch::spi::SpiDevice;
+// use embassy_embedded_hal;
 
-use crate::modules::lis302dl::Lis302Dl;
+// use crate::modules::lis302dl::Lis302Dl;
 
-#[derive(Copy, Clone, Debug)]
-pub enum AccelError<Dev, Rat> 
-{
-    DevError(Dev),
-    RatError(Rat)
-}
+// #[derive(Copy, Clone, Debug)]
+// pub enum AccelError<Dev, Rat>
+// {
+//     DevError(Dev),
+//     RatError(Rat)
+// }
 
 // pub struct AccelMon <Dev, Rat> {
 //     dev: Lis302Dl,
@@ -26,9 +26,9 @@ pub enum AccelError<Dev, Rat>
 //     }
 // }
 
-#[embassy_executor::task]
-pub async fn accel_task(accelerometer: Lis302Dl) -> ! {
-    loop {
-        info!("accel task running");
-}
-}
+// #[embassy_executor::task]
+// pub async fn accel_task() -> ! {
+//     loop {
+//         info!("accel task running");
+// }
+// }
