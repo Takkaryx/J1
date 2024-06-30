@@ -7,6 +7,7 @@ mod modules;
 
 // use tasks::accelerometer::{AccelMon, accel_task};
 // use tasks::accelerometer::{accel_task, AccelError};
+use embassy_time::{Duration, Timer};
 use tasks::heartbeat::{HeartBeat, heartbeat_task};
 use modules::lis302dl;
 
@@ -35,7 +36,7 @@ async fn main(spawner: Spawner) {
     // Set up a heartbeat LED to we know we're still working
     info!("{:?} Initializing heartbeat!", file!());
     let heartbeat_pin = p.PD12.degrade(); // green LED
-    let heart = HeartBeat::init(heartbeat_pin, 1000);
+    let heart = HeartBeat::init(heartbeat_pin, 500);
     spawner.spawn(heartbeat_task(heart)).unwrap();
 
     // Set up a button to have a blink and log message
@@ -52,9 +53,10 @@ async fn main(spawner: Spawner) {
 
     // Set up communication to the accelerometer
     info!("{:?} Initializing SPI for accelerometer", file!());
-        static SPI_BUS: StaticCell<Mutex<NoopRawMutex, spi::Spi<SPI1, DMA2_CH3, DMA2_CH2>>> = StaticCell::new();
+    static SPI_BUS: StaticCell<Mutex<NoopRawMutex, spi::Spi<SPI1, DMA2_CH3, DMA2_CH2>>> = StaticCell::new();
     let mut spi_config = Config::default();
     spi_config.frequency = Hertz(1_000_000);
+    spi_config.mode = spi::MODE_1;
     let spi= Spi::new(p.SPI1, p.PA5 ,p.PA7 ,p.PA6 ,p.DMA2_CH3 ,p.DMA2_CH2 , spi_config);
     let mut chip_select = Output::new(p.PE3, Level::High, Speed::High);
     chip_select.set_high();
@@ -64,6 +66,10 @@ async fn main(spawner: Spawner) {
     let config = lis302dl::Config::default();
     let mut accel_mon = lis302dl::Lis302Dl::new(spi_dev1, config);
     let _ = accel_mon.init().await;
+    loop {
+        Timer::after(Duration::from_millis(1000)).await;
+        let _ = accel_mon.read_accel().await;
+    }
     // spawner.spawn(accel_task(accel_mon)).unwrap();
 }
     

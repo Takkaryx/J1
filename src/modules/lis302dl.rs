@@ -4,7 +4,7 @@ use embedded_hal_async::spi;
 use defmt::*;
 
 const WHO_AM_I: u8 = 0x0F;
-const DEVICE_NAME: u8 = 0x3B;
+const DEVICE_NAME: u8 = 0x3F;
 
 const CTRL_REG1: u8 = 0x20;
 const CTRL_REG2: u8 = 0x21;
@@ -12,7 +12,7 @@ const CTRL_REG3: u8 = 0x22;
 
 const HP_FILTER_RESET: u8 = 0x23;
 const STATUS_REG: u8 = 0x27;
-const T_X: u8 = 0x29;
+const OUT_X: u8 = 0x29;
 const OUT_Y: u8 = 0x2B;
 const OUT_Z: u8 = 0x2D;
 const FF_WU_CFG_1: u8 = 0x30;
@@ -80,15 +80,15 @@ impl Default for Config {
     }
 }
 
-pub struct Lis302Dl<SPI>
-where SPI: spi::SpiDevice
+pub struct Lis302Dl<SPI, SpiError>
+where SPI: spi::SpiDevice<Error=SpiError>
 {
     spi: SPI,
     config: Config,
 }
 
-impl<SPI> Lis302Dl<SPI>
-where SPI: spi::SpiDevice
+impl<SPI, SpiError> Lis302Dl<SPI, SpiError>
+where SPI: spi::SpiDevice<Error=SpiError>
 {
     pub fn new(spi: SPI, config: Config) -> Self {
         Self {spi, config}
@@ -106,27 +106,25 @@ where SPI: spi::SpiDevice
     }
     
     async fn read_reg(&mut self, reg_address: u8) -> Result<u8, Lis302dlError<SPI>> {
-        let mut reg_data: [u8; 1] = [0; 1];
-        let _ = self.spi
-            .transaction(&mut [
-                spi::Operation::Write(&[reg_address]),
-                spi::Operation::Read(&mut reg_data),
-            ])
-            .await
-            .map_err(|e| Lis302dlError::SpiError(e));
-        info!("Reg data is: {:?}", reg_data);
+        let mut reg_data: [u8; 2] = [0; 2];
+        let _ = self.spi.transfer(&mut reg_data, &[reg_address | 1 << 7, 0]).await.map_err(|e| Lis302dlError::SpiError(e));
+        debug!("Reg data is: {:?}", reg_data[1]);
         Ok(reg_data[1])
     }
     
     async fn write_reg(&mut self, reg_address: u8, val: u8) -> Result<(), Lis302dlError<SPI>> {
-        let _ = self.spi
-            .transaction(&mut [
-                spi::Operation::Write(&[reg_address]),
-                spi::Operation::Write(&[val]),
-            ])
-            .await
-            .map_err(|e| Lis302dlError::SpiError(e));
+        // let _ = self.spi.write(&[reg_address, val]).await?;
+        let _ = self.spi.write(&[reg_address, val]).await.map_err(|e| Lis302dlError::SpiError(e));
+        Ok(())
+    }
 
+    pub async fn read_accel(&mut self) -> Result<(), Lis302dlError<SPI>> {
+        let x = self.read_reg(OUT_X).await?;
+        let y = self.read_reg(OUT_Y).await?;
+        let z = self.read_reg(OUT_Z).await?;
+        info!("x DATA is {:?}", x);
+        info!("y DATA is {:?}", y);
+        info!("z DATA is {:?}", z);
         Ok(())
     }
 
@@ -144,11 +142,9 @@ where SPI: spi::SpiDevice
             DataRate::Rate100Hz => DATA_RATE_100_HZ,
             DataRate::Rate400Hz => DATA_RATE_400_HZ,
         };
-        self.write_reg(CTRL_REG1, control_byte);
+        let _ = self.write_reg(CTRL_REG1, control_byte).await;
         Ok(())
     }
-
-    
 }
 
 #[derive(Copy, Clone)]
