@@ -5,11 +5,10 @@ mod tasks;
 mod utils;
 mod modules;
 
-// use tasks::accelerometer::{AccelMon, accel_task};
-// use tasks::accelerometer::{accel_task, AccelError};
-use embassy_time::{Duration, Timer};
+use modules::lis302dl::Lis302Dl;
+
 use tasks::heartbeat::{HeartBeat, heartbeat_task};
-use modules::lis302dl;
+use tasks::accel_mon::accel_task;
 
 use utils::button_mon::{ButtonMon, button_task};
 
@@ -52,7 +51,7 @@ async fn main(spawner: Spawner) {
     spawner.spawn(button_task(button_monitor)).unwrap();
 
     // Set up communication to the accelerometer
-    info!("{:?} Initializing SPI for accelerometer", file!());
+    info!("{:?} Initializing SPI", file!());
     static SPI_BUS: StaticCell<Mutex<NoopRawMutex, spi::Spi<SPI1, DMA2_CH3, DMA2_CH2>>> = StaticCell::new();
     let mut spi_config = Config::default();
     spi_config.frequency = Hertz(1_000_000);
@@ -63,13 +62,13 @@ async fn main(spawner: Spawner) {
     let spi_bus = Mutex::new(spi);
     let spi_bus = SPI_BUS.init(spi_bus);
     let spi_dev1 = SpiDevice::new(spi_bus, chip_select);
-    let config = lis302dl::Config::default();
-    let mut accel_mon = lis302dl::Lis302Dl::new(spi_dev1, config);
-    let _ = accel_mon.init().await;
-    loop {
-        Timer::after(Duration::from_millis(1000)).await;
-        let _ = accel_mon.read_accel().await;
-    }
-    // spawner.spawn(accel_task(accel_mon)).unwrap();
+
+    info!("{:?} Initializing Accelerometer", file!());
+    let config = modules::lis302dl::Config::default();
+    let mut lis302dl_device = Lis302Dl::new(spi_dev1, config);
+    let _ = lis302dl_device.init().await;
+    spawner.spawn(accel_task(lis302dl_device)).unwrap();
+
+    info!("{:?} Initializing USB", file!());
 }
     

@@ -1,11 +1,12 @@
 #![allow(unused_variables)]
 #![allow(dead_code)]
-use embedded_hal_async::spi;
+use crate::modules::accelerometer::{AccelData, Accelerometer};
 use defmt::*;
+use embedded_hal_async::spi;
+use core::fmt::Debug;
 
 const WHO_AM_I: u8 = 0x0F;
 const DEVICE_NAME: u8 = 0x3F;
-
 const CTRL_REG1: u8 = 0x20;
 const CTRL_REG2: u8 = 0x21;
 const CTRL_REG3: u8 = 0x22;
@@ -81,68 +82,89 @@ impl Default for Config {
 }
 
 pub struct Lis302Dl<SPI, SpiError>
-where SPI: spi::SpiDevice<Error=SpiError>
+where
+    SPI: spi::SpiDevice<Error = SpiError>,
 {
     spi: SPI,
     config: Config,
 }
 
 impl<SPI, SpiError> Lis302Dl<SPI, SpiError>
-where SPI: spi::SpiDevice<Error=SpiError>
+where
+    SPI: spi::SpiDevice<Error = SpiError>,
 {
     pub fn new(spi: SPI, config: Config) -> Self {
-        Self {spi, config}
+        Self { spi, config }
     }
 
     pub async fn init(&mut self) -> Result<(), Lis302dlError<SPI>> {
-         let name = self.read_reg(WHO_AM_I).await?;
+        // let name = self.read_reg(WHO_AM_I).await?;
+        let name = self.read_reg(WHO_AM_I).await;
         info!("Device name read is: {:?}", name);
         if name != DEVICE_NAME {
             error!("Lis302DL has incorrect name!");
         }
 
-        self.set_config().await?;
+        self.set_config()?;
         Ok(())
     }
-    
-    async fn read_reg(&mut self, reg_address: u8) -> Result<u8, Lis302dlError<SPI>> {
+
+    // async fn read_reg(&mut self, reg_address: u8) -> Result<u8, Lis302dlError<SPI>> {
+    async fn read_reg(&mut self, reg_address: u8) -> u8 {
+
         let mut reg_data: [u8; 2] = [0; 2];
-        let _ = self.spi.transfer(&mut reg_data, &[reg_address | 1 << 7, 0]).await.map_err(|e| Lis302dlError::SpiError(e));
+        let _ = self
+            .spi
+            .transfer(&mut reg_data, &[reg_address | READ_FLAG, 0])
+            .await
+            .map_err(|e| Lis302dlError::SpiError(e));
         debug!("Reg data is: {:?}", reg_data[1]);
-        Ok(reg_data[1])
+        reg_data[1]
     }
-    
+
     async fn write_reg(&mut self, reg_address: u8, val: u8) -> Result<(), Lis302dlError<SPI>> {
-        // let _ = self.spi.write(&[reg_address, val]).await?;
-        let _ = self.spi.write(&[reg_address, val]).await.map_err(|e| Lis302dlError::SpiError(e));
+        let _ = self
+            .spi
+            .write(&[reg_address, val])
+            .await
+            .map_err(|e| Lis302dlError::SpiError(e));
         Ok(())
     }
 
-    pub async fn read_accel(&mut self) -> Result<(), Lis302dlError<SPI>> {
-        let x = self.read_reg(OUT_X).await?;
-        let y = self.read_reg(OUT_Y).await?;
-        let z = self.read_reg(OUT_Z).await?;
-        info!("x DATA is {:?}", x);
-        info!("y DATA is {:?}", y);
-        info!("z DATA is {:?}", z);
-        Ok(())
+    // pub async fn lis302dl_read_accel(&mut self) -> Result<AccelData, Lis302dlError<SPI>> {
+    pub async fn lis302dl_read_accel(&mut self) -> AccelData {
+        let x = self.read_reg(OUT_X).await;
+        let y = self.read_reg(OUT_Y).await;
+        let z = self.read_reg(OUT_Z).await;
+        let scaled_x = i8::from_le_bytes([x]) as f32 * SCALE;
+        let scaled_y = i8::from_le_bytes([y]) as f32 * SCALE;
+        let scaled_z = i8::from_le_bytes([z]) as f32 * SCALE;
+        debug!("x DATA is {:?}", scaled_x);
+        debug!("y DATA is {:?}", scaled_y);
+        debug!("z DATA is {:?}", scaled_z);
+        debug!("total accel is {:?}", scaled_x + scaled_y + scaled_z);
+        AccelData {
+            x: scaled_x,
+            y: scaled_y,
+            z: scaled_z,
+        }
     }
 
-    async fn set_config(&mut self) -> Result<(), Lis302dlError<SPI>> {
+    fn set_config(&mut self) -> Result<(), Lis302dlError<SPI>> {
         let mut control_byte = X_ENABLE | Y_ENABLE | Z_ENABLE;
         control_byte |= match self.config.power_mode {
             PowerMode::Active => ACTIVE_MODE,
             PowerMode::Powerdown => POWER_DOWN_MODE,
         };
         control_byte |= match self.config.scale {
-            Scale::TwoG=> SCALE_PLUS_MINUS_2G,
-            Scale::EightG=> SCALE_PLUS_MINUS_8G,
+            Scale::TwoG => SCALE_PLUS_MINUS_2G,
+            Scale::EightG => SCALE_PLUS_MINUS_8G,
         };
         control_byte |= match self.config.data_rate {
             DataRate::Rate100Hz => DATA_RATE_100_HZ,
             DataRate::Rate400Hz => DATA_RATE_400_HZ,
         };
-        let _ = self.write_reg(CTRL_REG1, control_byte).await;
+        let _ = self.write_reg(CTRL_REG1, control_byte);
         Ok(())
     }
 }
@@ -150,7 +172,7 @@ where SPI: spi::SpiDevice<Error=SpiError>
 #[derive(Copy, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Lis302dlError<Spi> {
-    SpiError(Spi)
+    SpiError(Spi),
 }
 
 impl<SpiError> Lis302dlError<SpiError> {
@@ -163,9 +185,26 @@ impl<SpiError> Lis302dlError<SpiError> {
     }
 }
 
+// impl<SpiError> Debug for Lis302dlError<SpiError> {
+//     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+//          defmt::write!(f, "{}", self.message());
+//          Ok(())
+//     }
+// }
+
 // implicit `?` syntax for SpiError to Lis302dlError
 impl<SpiError> core::convert::From<SpiError> for Lis302dlError<SpiError> {
     fn from(value: SpiError) -> Self {
         Lis302dlError::SpiError(value)
+    }
+}
+
+impl<SPI, SpiError> Accelerometer for Lis302Dl<SPI, SpiError>
+where
+    SPI: spi::SpiDevice<Error = SpiError>,
+{
+    // type Error = Lis302dlError<SpiError>;
+    async fn read_accel(&mut self) -> AccelData {
+        self.lis302dl_read_accel().await
     }
 }
