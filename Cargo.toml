@@ -15,10 +15,11 @@ defmt = "0.3.6"
 defmt-rtt = "0.4.1"
 embassy-embedded-hal = "0.1.0"
 embassy-executor = { version = "0.5.0", features = ["task-arena-size-32768", "arch-cortex-m", "executor-thread", "executor-interrupt", "integrated-timers"]}
-embassy-stm32 = { version = "0.1.0", features = ["unstable-pac","memory-x", "time-driver-any", "exti", "chrono", "stm32f407vg"] }
+embassy-futures = "0.1.1"
+embassy-stm32 = { version = "0.1.0", features = ["defmt", "unstable-pac","memory-x", "time-driver-any", "exti", "chrono", "stm32f407vg"]}
 embassy-sync = { version = "0.5.0", features = ["defmt"] }
 embassy-time = "0.3.0"
-# embassy-usb = "0.1.0"
+embassy-usb = { version = "0.2.0", features = ["defmt"] }
 embedded-hal = "1.0.0"
 embedded-hal-async = "1.0.0"
 panic-halt = "0.2.0"

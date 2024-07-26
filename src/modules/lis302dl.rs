@@ -105,13 +105,12 @@ where
             error!("Lis302DL has incorrect name!");
         }
 
-        self.set_config()?;
+        self.set_config().await;
         Ok(())
     }
 
     // async fn read_reg(&mut self, reg_address: u8) -> Result<u8, Lis302dlError<SPI>> {
     async fn read_reg(&mut self, reg_address: u8) -> u8 {
-
         let mut reg_data: [u8; 2] = [0; 2];
         let _ = self
             .spi
@@ -122,13 +121,12 @@ where
         reg_data[1]
     }
 
-    async fn write_reg(&mut self, reg_address: u8, val: u8) -> Result<(), Lis302dlError<SPI>> {
+    // async fn write_reg(&mut self, reg_address: u8, val: u8) -> Result<(), Lis302dlError<SPI>> {
+    async fn write_reg(&mut self, reg_address: u8, val: u8) {
         let _ = self
             .spi
             .write(&[reg_address, val])
-            .await
-            .map_err(|e| Lis302dlError::SpiError(e));
-        Ok(())
+            .await;
     }
 
     // pub async fn lis302dl_read_accel(&mut self) -> Result<AccelData, Lis302dlError<SPI>> {
@@ -150,7 +148,7 @@ where
         }
     }
 
-    fn set_config(&mut self) -> Result<(), Lis302dlError<SPI>> {
+    async fn set_config(&mut self) {
         let mut control_byte = X_ENABLE | Y_ENABLE | Z_ENABLE;
         control_byte |= match self.config.power_mode {
             PowerMode::Active => ACTIVE_MODE,
@@ -164,8 +162,7 @@ where
             DataRate::Rate100Hz => DATA_RATE_100_HZ,
             DataRate::Rate400Hz => DATA_RATE_400_HZ,
         };
-        let _ = self.write_reg(CTRL_REG1, control_byte);
-        Ok(())
+        let _ = self.write_reg(CTRL_REG1, control_byte).await;
     }
 }
 

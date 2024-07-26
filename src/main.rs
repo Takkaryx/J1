@@ -9,6 +9,7 @@ use modules::lis302dl::Lis302Dl;
 
 use tasks::heartbeat::{HeartBeat, heartbeat_task};
 use tasks::accel_mon::accel_task;
+use tasks::usb::usb_task;
 
 use utils::button_mon::{ButtonMon, button_task};
 
@@ -20,8 +21,8 @@ use embassy_sync::blocking_mutex::raw::NoopRawMutex;
 use embassy_stm32::exti::Channel;
 use embassy_stm32::peripherals::{DMA2_CH3, DMA2_CH2, SPI1};
 use embassy_stm32::gpio::{Pin, Level, Output, Speed};
-use embassy_stm32::spi::{Config, Spi};
-use embassy_stm32::spi;
+use embassy_stm32::spi::{Config as SpiConfig, Spi};
+use embassy_stm32::{Config as Stm32_Config, spi};
 use embassy_stm32::time::Hertz;
 use panic_halt as _;
 use defmt::*;
@@ -30,12 +31,32 @@ use defmt_rtt as _;
 #[embassy_executor::main]
 async fn main(spawner: Spawner) {
     // Initialize the peripherals
-    let p = embassy_stm32::init(Default::default());
+    let mut config = Stm32_Config::default();
+    {
+        use embassy_stm32::rcc::*;
+        config.rcc.hse = Some(Hse {
+            freq: Hertz(8_000_000),
+            mode: HseMode::Bypass,
+        });
+        config.rcc.pll_src = PllSource::HSE;
+        config.rcc.pll = Some(Pll {
+            prediv: PllPreDiv::DIV4,
+            mul: PllMul::MUL168,
+            divp: Some(PllPDiv::DIV2), // 8mhz / 4 * 168 / 2 = 168Mhz.
+            divq: Some(PllQDiv::DIV7), // 8mhz / 4 * 168 / 7 = 48Mhz.
+            divr: None,
+        });
+        config.rcc.ahb_pre = AHBPrescaler::DIV1;
+        config.rcc.apb1_pre = APBPrescaler::DIV4;
+        config.rcc.apb2_pre = APBPrescaler::DIV2;
+        config.rcc.sys = Sysclk::PLL1_P;
+    }
+    let p = embassy_stm32::init(config);
 
     // Set up a heartbeat LED to we know we're still working
     info!("{:?} Initializing heartbeat!", file!());
     let heartbeat_pin = p.PD12.degrade(); // green LED
-    let heart = HeartBeat::init(heartbeat_pin, 500);
+    let heart = HeartBeat::init(heartbeat_pin, 1000);
     spawner.spawn(heartbeat_task(heart)).unwrap();
 
     // Set up a button to have a blink and log message
@@ -53,7 +74,7 @@ async fn main(spawner: Spawner) {
     // Set up communication to the accelerometer
     info!("{:?} Initializing SPI", file!());
     static SPI_BUS: StaticCell<Mutex<NoopRawMutex, spi::Spi<SPI1, DMA2_CH3, DMA2_CH2>>> = StaticCell::new();
-    let mut spi_config = Config::default();
+    let mut spi_config = SpiConfig::default();
     spi_config.frequency = Hertz(1_000_000);
     spi_config.mode = spi::MODE_1;
     let spi= Spi::new(p.SPI1, p.PA5 ,p.PA7 ,p.PA6 ,p.DMA2_CH3 ,p.DMA2_CH2 , spi_config);
@@ -70,5 +91,6 @@ async fn main(spawner: Spawner) {
     spawner.spawn(accel_task(lis302dl_device)).unwrap();
 
     info!("{:?} Initializing USB", file!());
+    spawner.spawn(usb_task(p.USB_OTG_FS, p.PA12, p.PA11)).unwrap();
 }
     
