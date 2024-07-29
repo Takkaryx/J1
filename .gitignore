@@ -1,2 +1,4 @@
 **/*/target
 **/*/Cargo.lock
+j1-host/target
+j1-postcard/target
