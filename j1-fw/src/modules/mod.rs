@@ -1,3 +1,3 @@
 pub mod accelerometer;
-// pub mod error;
 pub mod lis302dl;
+pub mod postcard_dispatch;
