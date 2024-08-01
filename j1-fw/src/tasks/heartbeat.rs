@@ -3,7 +3,7 @@ use embassy_stm32::gpio::{AnyPin, Level, Output, Speed};
 use embassy_time::{Duration, Timer};
 
 pub struct HeartBeat<'a> {
-    led: Output<'a, AnyPin>,
+    led: Output<'a>,
     del: AtomicU32,
 }
 

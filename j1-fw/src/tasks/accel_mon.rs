@@ -1,19 +1,18 @@
 use defmt::*;
-use crate::modules::accelerometer::{AccelData, Accelerometer};
+use crate::modules::accelerometer::{Accel, Accelerometer};
 use embassy_time::{Duration, Ticker};
-use core::cell::RefCell;
-use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
-use embassy_sync::blocking_mutex;
+use static_cell::StaticCell;
+use embassy_sync::blocking_mutex::{Mutex, raw::ThreadModeRawMutex};
 
-pub static ACCEL_TELEM_MUTEX_BLOCKING: blocking_mutex::Mutex<CriticalSectionRawMutex, RefCell<AccelData>> =
-    blocking_mutex::Mutex::new(RefCell::new(AccelData{ x: 0.0, y: 0.0, z: 0.0 }));
+static ACCEL: StaticCell<Mutex<ThreadModeRawMutex, Accel>> = StaticCell::new();
 
 #[embassy_executor::task]
 pub async fn accel_task(mut device: impl Accelerometer + 'static) -> ! {
     let mut ticker = Ticker::every(Duration::from_secs(1));
+    let accel_ref = ACCEL.init(Mutex::new(Accel {x: 0.0, y: 0.0, z: 0.0}));
     loop {
         let accel_vectors = device.read_accel().await;
-        ACCEL_TELEM_MUTEX_BLOCKING.lock(|data| {
+        ACCEL.lock(|data| {
             data.borrow_mut().x = accel_vectors.x; 
             data.borrow_mut().y = accel_vectors.y; 
             data.borrow_mut().z = accel_vectors.z;

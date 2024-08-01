@@ -1,7 +1,11 @@
 use embassy_stm32::peripherals::{USB_OTG_FS, PA11, PA12};
-use embassy_stm32::usb_otg::Driver;
-use embassy_stm32::{bind_interrupts, peripherals, usb_otg};
+use embassy_stm32::usb::Driver;
+use embassy_stm32::{bind_interrupts, peripherals, usb};
+use embassy_sync::blocking_mutex::{Mutex, raw::ThreadModeRawMutex};
 use embassy_usb::Builder;
+use static_cell::ConstStaticCell;
+
+use crate::modules::accelerometer::Accel;
 
 use postcard_rpc::{
     define_dispatch,
@@ -12,13 +16,12 @@ use postcard_rpc::{
     WireHeader,
 };
 
+use j1_postcard::{PingEndpoint, StartAccelerationEndpoint, StopAccelerationEndpoint};
+
 static ALL_BUFFERS: ConstStaticCell<AllBuffers<256, 256, 256>> =
     ConstStaticCell::new(AllBuffers::new());
 
 pub struct Context {
-    pub unique_id: u64,
-    pub ws2812: Ws2812<'static, PIO0, 0, 24>,
-    pub ws2812_state: [RGB8; 24],
     pub accel: &'static Mutex<ThreadModeRawMutex, Accel>,
 }
 
@@ -36,7 +39,7 @@ impl SpawnContext for Context {
 define_dispatch! {
     dispatcher: Dispatcher<
         Mutex = ThreadModeRawMutex,
-        Driver = usb::Driver<'static, USB>,
+        Driver = usb::Driver<'static, USB_OTG_FS>,
         Context = Context,
     >;
     PingEndpoint => blocking ping_handler,
@@ -45,14 +48,14 @@ define_dispatch! {
 }
 
 bind_interrupts!(struct Irqs {
-    OTG_FS => usb_otg::InterruptHandler<peripherals::USB_OTG_FS>;
+    OTG_FS => usb::InterruptHandler<peripherals::USB_OTG_FS>;
 });
 
 #[embassy_executor::task]
 pub async fn usb_task(usb_dev: USB_OTG_FS, pin1: PA12, pin2: PA11) {
     // Create the driver, from the HAL.
     let mut ep_out_buffer = [0u8; 256];
-    let mut config = embassy_stm32::usb_otg::Config::default();
+    let mut config = embassy_stm32::usb::Config::default();
 
     config.vbus_detection = true;
 

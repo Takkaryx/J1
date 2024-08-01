@@ -1,6 +1,6 @@
 #![allow(unused_variables)]
 #![allow(dead_code)]
-use crate::modules::accelerometer::{AccelData, Accelerometer};
+use crate::modules::accelerometer::{Accel, Accelerometer};
 use defmt::*;
 use embedded_hal_async::spi;
 use core::fmt::Debug;
@@ -131,7 +131,7 @@ where
     }
 
     // pub async fn lis302dl_read_accel(&mut self) -> Result<AccelData, Lis302dlError<SPI>> {
-    pub async fn lis302dl_read_accel(&mut self) -> AccelData {
+    pub async fn lis302dl_read_accel(&mut self) -> Accel {
         let x = self.read_reg(OUT_X).await;
         let y = self.read_reg(OUT_Y).await;
         let z = self.read_reg(OUT_Z).await;
@@ -142,7 +142,7 @@ where
         debug!("y DATA is {:?}", scaled_y);
         debug!("z DATA is {:?}", scaled_z);
         debug!("total accel is {:?}", scaled_x + scaled_y + scaled_z);
-        AccelData {
+        Accel {
             x: scaled_x,
             y: scaled_y,
             z: scaled_z,
@@ -202,7 +202,7 @@ where
     SPI: spi::SpiDevice<Error = SpiError>,
 {
     // type Error = Lis302dlError<SpiError>;
-    async fn read_accel(&mut self) -> AccelData {
+    async fn read_accel(&mut self) -> Accel {
         self.lis302dl_read_accel().await
     }
 }

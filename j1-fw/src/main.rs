@@ -11,16 +11,15 @@ use tasks::heartbeat::{HeartBeat, heartbeat_task};
 use tasks::accel_mon::accel_task;
 use tasks::usb::usb_task;
 
-use utils::button_mon::{ButtonMon, button_task};
-
+use utils::button_mon::button_task;
 use embassy_executor::Spawner;
 use static_cell::StaticCell;
 use embassy_embedded_hal::shared_bus::asynch::spi::SpiDevice;
 use embassy_sync::mutex::Mutex;
 use embassy_sync::blocking_mutex::raw::NoopRawMutex;
-use embassy_stm32::exti::Channel;
+use embassy_stm32::exti::{Channel, ExtiInput};
 use embassy_stm32::peripherals::{DMA2_CH3, DMA2_CH2, SPI1};
-use embassy_stm32::gpio::{Pin, Level, Output, Speed};
+use embassy_stm32::gpio::{Pin, Level, Output, Speed, Pull};
 use embassy_stm32::spi::{Config as SpiConfig, Spi};
 use embassy_stm32::{Config as Stm32_Config, spi};
 use embassy_stm32::time::Hertz;
@@ -62,17 +61,15 @@ async fn main(spawner: Spawner) {
 
     // Select which pins are used
     info!("{:?} Initializing button!", file!());
-    let led= p.PD14.degrade(); // red LED
-    let button_pin = p.PA0.degrade();
-    let int= p.EXTI0.degrade();
-    // Configure the button monitor
-    let button_monitor = ButtonMon::init(led, button_pin, int);
+    let led= Output::new(p.PD14, Level::Low, Speed::Low); // red LED
+    let ext = ExtiInput::new(p.PA0.degrade(), p.EXTI0.degrade(), Pull::None);
     // Start the button monitoring task
-    spawner.must_spawn(button_task(button_monitor));
+    spawner.must_spawn(button_task(led, ext));
 
     // Set up communication to the accelerometer
     info!("{:?} Initializing SPI", file!());
-    static SPI_BUS: StaticCell<Mutex<NoopRawMutex, spi::Spi<SPI1, DMA2_CH3, DMA2_CH2>>> = StaticCell::new();
+    // static SPI_BUS: StaticCell<Mutex<NoopRawMutex, spi::Spi<SPI1, DMA2_CH3, DMA2_CH2>>> = StaticCell::new();
+    static SPI_BUS: StaticCell<Mutex<NoopRawMutex, spi::Spi<'static, embassy_stm32::mode::Async>>> = StaticCell::new();
     let mut spi_config = SpiConfig::default();
     spi_config.frequency = Hertz(1_000_000);
     spi_config.mode = spi::MODE_1;

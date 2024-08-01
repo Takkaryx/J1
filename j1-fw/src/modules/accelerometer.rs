@@ -1,8 +1,7 @@
-// use crate::modules::error::Error;
-// use core::fmt::Debug;
 
-// #[derive(Serialize)]
-pub struct AccelData {
+pub type Accel = AccelData;
+
+struct AccelData {
     pub x: f32,
     pub y: f32,
     pub z: f32,
