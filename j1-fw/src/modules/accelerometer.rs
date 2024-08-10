@@ -1,7 +1,7 @@
 
 pub type Accel = AccelData;
 
-struct AccelData {
+pub struct AccelData {
     pub x: f32,
     pub y: f32,
     pub z: f32,

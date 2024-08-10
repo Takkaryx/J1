@@ -18,7 +18,6 @@ use embassy_embedded_hal::shared_bus::asynch::spi::SpiDevice;
 use embassy_sync::mutex::Mutex;
 use embassy_sync::blocking_mutex::raw::NoopRawMutex;
 use embassy_stm32::exti::{Channel, ExtiInput};
-use embassy_stm32::peripherals::{DMA2_CH3, DMA2_CH2, SPI1};
 use embassy_stm32::gpio::{Pin, Level, Output, Speed, Pull};
 use embassy_stm32::spi::{Config as SpiConfig, Spi};
 use embassy_stm32::{Config as Stm32_Config, spi};

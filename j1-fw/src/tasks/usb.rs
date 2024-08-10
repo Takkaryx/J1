@@ -1,3 +1,4 @@
+use defmt::info;
 use embassy_stm32::peripherals::{USB_OTG_FS, PA11, PA12};
 use embassy_stm32::usb::Driver;
 use embassy_stm32::{bind_interrupts, peripherals, usb};
@@ -43,13 +44,22 @@ define_dispatch! {
         Context = Context,
     >;
     PingEndpoint => blocking ping_handler,
-    StartAccelerationEndpoint => spawn accelerometer_handler,
+    StartAccelerationEndpoint => blocking accelerometer_handler,
     StopAccelerationEndpoint => blocking accelerometer_stop_handler,
 }
 
 bind_interrupts!(struct Irqs {
     OTG_FS => usb::InterruptHandler<peripherals::USB_OTG_FS>;
 });
+
+#[embassy_executor::task]
+async fn dispatch_task(
+    ep_out: Endpoint<'static, USB, Out>,
+    dispatch: Dispatcher,
+    rx_buf: &'static mut [u8],
+) {
+    rpc_dispatch(ep_out, dispatch, rx_buf).await;
+}
 
 #[embassy_executor::task]
 pub async fn usb_task(usb_dev: USB_OTG_FS, pin1: PA12, pin2: PA11) {
@@ -81,10 +91,28 @@ pub async fn usb_task(usb_dev: USB_OTG_FS, pin1: PA12, pin2: PA11) {
         &mut control_buf,
     );
 
+    let driver = usb::Driver::new(usb_dev, Irqs);
+        let mut config = example_config();
+        config.manufacturer = Some("OneVariable");
+        config.product = Some("ov-twin");
+        let buffers = ALL_BUFFERS.take();
+        let (device, ep_in, ep_out) = configure_usb(driver, &mut buffers.usb_device, config);
+        let dispatch = Dispatcher::new(
+            &mut buffers.tx_buf,
+            ep_in,
+            Context {
+                accel: accel_ref,
+            },
+        );
+
     // Build the builder.
     let mut usb = builder.build();
 
     // Run the USB device.
-
     usb.run().await;
+}
+
+fn ping_handler(_context: &mut Context, header: WireHeader, rqst: u32) -> u32 {
+    info!("ping: seq - {=u32}", header.seq_no);
+    rqst
 }
