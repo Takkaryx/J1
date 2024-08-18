@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package accel;
+
+import "google/protobuf/timestamp.proto";
+
+message Accel {
+  google.protobuf.Timestamp time = 1;
+  optional float x_accel = 2;
+  optional float y_accel = 3;
+  optional float z_accel = 4;
+}

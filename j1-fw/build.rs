@@ -15,6 +15,20 @@ use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 
+use micropb_gen::Generator;
+
+fn proto_generate() {
+    let mut gen = Generator::new();
+    gen.use_container_heapless()
+        .add_protoc_arg("-I".to_owned() + &std::env::var("PROTO_DIR").unwrap())
+        .compile_protos(
+            &["accel.proto", "google/protobuf/timestamp.proto"],
+            std::env::var("OUT_DIR").unwrap() + "/j1_proto.rs",
+        )
+        .unwrap();
+    println!("cargo:rerun-if-changed=proto");
+}
+
 fn main() {
     // Put `memory.x` in our output directory and ensure it's
     // on the linker search path.
@@ -23,6 +37,7 @@ fn main() {
         .unwrap()
         .write_all(include_bytes!("memory.x"))
         .unwrap();
+
     println!("cargo:rustc-link-search={}", out.display());
 
     // By default, Cargo will re-run a build script whenever
@@ -43,4 +58,6 @@ fn main() {
 
     // Defmt linker to enable RTT logs
     println!("cargo:rustc-link-arg=-Tdefmt.x");
+
+    proto_generate();
 }

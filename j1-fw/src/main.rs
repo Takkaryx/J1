@@ -12,6 +12,7 @@ use tasks::accel_mon::accel_task;
 use tasks::usb::usb_task;
 
 use utils::button_mon::{ButtonMon, button_task};
+use utils::rtc_read::rtc_init;
 
 use embassy_executor::Spawner;
 use static_cell::StaticCell;
@@ -53,11 +54,13 @@ async fn main(spawner: Spawner) {
     }
     let p = embassy_stm32::init(config);
 
+    rtc_init(p.RTC);
+
     // Set up a heartbeat LED to we know we're still working
     info!("{:?} Initializing heartbeat!", file!());
     let heartbeat_pin = p.PD12.degrade(); // green LED
     let heart = HeartBeat::init(heartbeat_pin, 1000);
-    spawner.spawn(heartbeat_task(heart)).unwrap();
+    spawner.must_spawn(heartbeat_task(heart));
 
     // Set up a button to have a blink and log message
 
@@ -69,7 +72,7 @@ async fn main(spawner: Spawner) {
     // Configure the button monitor
     let button_monitor = ButtonMon::init(led, button_pin, int);
     // Start the button monitoring task
-    spawner.spawn(button_task(button_monitor)).unwrap();
+    spawner.must_spawn(button_task(button_monitor));
 
     // Set up communication to the accelerometer
     info!("{:?} Initializing SPI", file!());
@@ -88,9 +91,9 @@ async fn main(spawner: Spawner) {
     let config = modules::lis302dl::Config::default();
     let mut lis302dl_device = Lis302Dl::new(spi_dev1, config);
     let _ = lis302dl_device.init().await;
-    spawner.spawn(accel_task(lis302dl_device)).unwrap();
+    spawner.must_spawn(accel_task(lis302dl_device));
 
     info!("{:?} Initializing USB", file!());
-    spawner.spawn(usb_task(p.USB_OTG_FS, p.PA12, p.PA11)).unwrap();
+    spawner.must_spawn(usb_task(p.USB_OTG_FS, p.PA12, p.PA11));
 }
     

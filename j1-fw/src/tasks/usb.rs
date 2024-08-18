@@ -6,6 +6,25 @@ use embassy_stm32::{bind_interrupts, peripherals, usb_otg};
 use embassy_usb::class::cdc_acm::{CdcAcmClass, State};
 use embassy_usb::driver::EndpointError;
 use embassy_usb::Builder;
+use embassy_time::{Duration, Ticker};
+
+use heapless::Vec;
+// use micropb::PbWrite;
+use micropb::{
+    // heapless::Vec,
+    MessageEncode, PbEncoder,
+};
+
+mod proto {
+    #![allow(clippy::all)]
+    #![allow(nonstandard_style, unused, irrefutable_let_patterns)]
+    // Let's assume that Example is the only message define in the .proto file that has been 
+    // converted into a Rust struct
+    include!(concat!(env!("OUT_DIR"), "/j1_proto.rs"));
+}
+
+use proto::accel_::*;
+use proto::google_::protobuf_::*;
 
 bind_interrupts!(struct Irqs {
     OTG_FS => usb_otg::InterruptHandler<peripherals::USB_OTG_FS>;
@@ -71,7 +90,7 @@ pub async fn usb_task(usb_dev: USB_OTG_FS, pin1: PA12, pin2: PA11) {
         loop {
             class.wait_connection().await;
             info!("Connected");
-            let _ = echo(&mut class).await;
+            let _ = stream_telem(&mut class).await;
             info!("Disconnected");
         }
     };
@@ -92,12 +111,28 @@ impl From<EndpointError> for Disconnected {
     }
 }
 
-async fn echo<'d, T: Instance + 'd>(class: &mut CdcAcmClass<'d, Driver<'d, T>>) -> Result<(), Disconnected> {
-    let mut buf = [0; 64];
+async fn stream_telem<'d, T: Instance + 'd>(class: &mut CdcAcmClass<'d, Driver<'d, T>>) -> Result<(), Disconnected> {
+    let mut ticker = Ticker::every(Duration::from_millis(100));
+    let mut stream = Vec::<u8, 64>::new();
     loop {
-        let n = class.read_packet(&mut buf).await?;
-        let data = &buf[..n];
-        info!("data: {:x}", data);
-        class.write_packet(data).await?;
+        stream.clear();
+        let mut encoder = PbEncoder::new(&mut stream);
+        let telem = construct_telem();
+        telem.encode_len_delimited(&mut encoder).unwrap();
+        info!("wrote buffer! {:?}", stream.as_slice());
+        class.write_packet(stream.as_slice()).await?;
+        ticker.next().await;
     }
+}
+fn construct_telem() -> Accel {
+    Accel {
+            time: Timestamp {
+            seconds: 1777674,
+            nanos: 2000,
+        },
+            x_accel: 1.0,
+            y_accel: -1.2,
+            z_accel: 1.14,
+            _has: Accel_::_Hazzer::default().init_time().init_x_accel().init_y_accel().init_z_accel()
+        }
 }

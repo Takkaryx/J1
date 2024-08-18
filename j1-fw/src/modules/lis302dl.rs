@@ -167,7 +167,6 @@ where
 }
 
 #[derive(Copy, Clone)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Lis302dlError<Spi> {
     SpiError(Spi),
 }
