@@ -1,6 +1,7 @@
 // use crate::modules::error::Error;
 // use core::fmt::Debug;
 
+#[derive(Clone)]
 pub struct AccelData {
     pub x: f32,
     pub y: f32,

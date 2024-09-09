@@ -14,6 +14,8 @@ use micropb::{
     // heapless::Vec,
     MessageEncode, PbEncoder,
 };
+use crate::utils::rtc_read::get_ticks;
+use crate::tasks::accel_mon::ACCEL;
 
 mod proto {
     #![allow(clippy::all)]
@@ -24,7 +26,6 @@ mod proto {
 }
 
 use proto::accel_::*;
-use proto::google_::protobuf_::*;
 
 bind_interrupts!(struct Irqs {
     OTG_FS => usb_otg::InterruptHandler<peripherals::USB_OTG_FS>;
@@ -36,10 +37,6 @@ pub async fn usb_task(usb_dev: USB_OTG_FS, pin1: PA12, pin2: PA11) {
     let mut ep_out_buffer = [0u8; 256];
     let mut config = embassy_stm32::usb_otg::Config::default();
 
-    // Do not enable vbus_detection. This is a safe default that works in all boards.
-    // However, if your USB device is self-powered (can stay powered on if USB is unplugged), you need
-    // to enable vbus_detection to comply with the USB spec. If you enable it, the board
-    // has to support it or USB won't work at all. See docs on `vbus_detection` for details.
     config.vbus_detection = true;
 
     let driver = Driver::new_fs(usb_dev, Irqs, pin1, pin2, &mut ep_out_buffer, config);
@@ -119,20 +116,22 @@ async fn stream_telem<'d, T: Instance + 'd>(class: &mut CdcAcmClass<'d, Driver<'
         let mut encoder = PbEncoder::new(&mut stream);
         let telem = construct_telem();
         telem.encode_len_delimited(&mut encoder).unwrap();
-        info!("wrote buffer! {:?}", stream.as_slice());
         class.write_packet(stream.as_slice()).await?;
         ticker.next().await;
     }
 }
 fn construct_telem() -> Accel {
-    Accel {
-            time: Timestamp {
-            seconds: 1777674,
-            nanos: 2000,
-        },
-            x_accel: 1.0,
-            y_accel: -1.2,
-            z_accel: 1.14,
-            _has: Accel_::_Hazzer::default().init_time().init_x_accel().init_y_accel().init_z_accel()
-        }
+    let now = get_ticks();
+    let accel_data = ACCEL.lock(|f| {
+        return f.clone().unwrap();
+    });
+    let data = Accel {
+            time: now.and_utc().timestamp_millis(),
+            x_accel: accel_data.x,
+            y_accel: accel_data.y,
+            z_accel: accel_data.z,
+            _has: Accel_::_Hazzer::default().init_x_accel().init_y_accel().init_z_accel()
+        };
+    info!("x: {}, y: {}, z: {}, timestamp: {}", data.x_accel, data.y_accel, data.z_accel, data.time);
+    data
 }

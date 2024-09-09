@@ -1,26 +1,55 @@
-use chrono::{NaiveDate, NaiveDateTime};
-use defmt::info;
+use chrono::NaiveDateTime;
+use core::borrow::BorrowMut;
+use core::cell::RefCell;
+use core::sync::atomic::{AtomicBool, Ordering};
+use defmt::panic;
 use embassy_stm32::peripherals::RTC;
-use embassy_stm32::rtc::*;
-// use embassy_sync::{blocking_mutex::raw::ThreadModeRawMutex, mutex::Mutex};
-use static_cell::StaticCell;
+use embassy_stm32::rtc::Rtc;
+use embassy_stm32::rtc::RtcConfig;
+use embassy_sync::blocking_mutex::raw::ThreadModeRawMutex;
+use embassy_sync::blocking_mutex::Mutex;
 
-static LOCAL_RTC: StaticCell<Rtc> = StaticCell::new();
-
-pub fn rtc_init(rtc_periph: RTC) {
-    let rtc_config = embassy_stm32::rtc::RtcConfig::default();
-    let rtc = embassy_stm32::rtc::Rtc::new(rtc_periph, rtc_config);
-    let now: NaiveDateTime = rtc.now().unwrap().into();
-    LOCAL_RTC.init(rtc);
-
-    info!("Initializing RTC at {:?}", now.and_utc().timestamp());
+// Define the global state structure
+pub struct LocalRtc {
+    rtc: RefCell<Rtc>,
 }
 
-#[allow(dead_code)]
-pub fn read_rtc() -> NaiveDateTime {
-    let now = NaiveDate::from_ymd_opt(2020, 5, 15)
-        .unwrap()
-        .and_hms_opt(10, 30, 15)
-        .unwrap();
-    now.into()
+// Atomic flag to ensure initialization happens only once
+static INITIALIZED: AtomicBool = AtomicBool::new(false);
+pub static LOCAL_RTC: Mutex<ThreadModeRawMutex, Option<LocalRtc>> = Mutex::new(None);
+
+pub fn init(rtc_periph: RTC) {
+    // Ensure initialization only happens once
+    if INITIALIZED
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_ok()
+    {
+        return;
+    }
+
+    // Perform the initialization
+    let rtc_config = RtcConfig::default();
+    let rtc = Rtc::new(rtc_periph, rtc_config);
+    let local_rtc = LocalRtc {
+        rtc: RefCell::new(rtc),
+    };
+
+    LOCAL_RTC.lock(|mut f| {
+        let mut val = f.borrow_mut().as_ref();
+        val.replace(&local_rtc);
+    });
+}
+
+pub fn get_ticks() -> NaiveDateTime {
+    LOCAL_RTC.lock(|f| {
+        let ticks = f.as_ref().unwrap().get_ticks();
+        return ticks;
+    });
+    panic!("RTC problems");
+}
+
+impl LocalRtc {
+    pub fn get_ticks(&self) -> NaiveDateTime {
+        self.rtc.borrow().now().expect("Failed to get time").into()
+    }
 }
