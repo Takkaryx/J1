@@ -14,7 +14,7 @@ pub struct LocalRtc {
 }
 
 // Atomic flag to ensure initialization happens only once
-pub static LOCAL_RTC: Mutex<ThreadModeRawMutex, RefCell<Option<LocalRtc>>> =
+static LOCAL_RTC: Mutex<ThreadModeRawMutex, RefCell<Option<LocalRtc>>> =
     Mutex::new(RefCell::new(None));
 
 pub fn init(rtc_periph: RTC) {

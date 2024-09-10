@@ -122,9 +122,8 @@ async fn stream_telem<'d, T: Instance + 'd>(class: &mut CdcAcmClass<'d, Driver<'
 }
 fn construct_telem() -> Accel {
     let now = get_ticks_since_boot();
-    info!("now: {}", now);
     let accel_data = ACCEL.lock(|f| {
-        return f.clone().unwrap();
+        f.borrow().clone()
     });
     let data = Accel {
             time: now,
