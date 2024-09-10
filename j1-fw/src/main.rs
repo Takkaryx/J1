@@ -12,7 +12,7 @@ use tasks::accel_mon::accel_task;
 use tasks::usb::usb_task;
 
 use utils::button_mon::{ButtonMon, button_task};
-use utils::rtc_read::init;
+use utils::rtc_read::{get_ticks, init};
 
 use embassy_executor::Spawner;
 use static_cell::StaticCell;
@@ -55,7 +55,9 @@ async fn main(spawner: Spawner) {
     let p = embassy_stm32::init(config);
 
 
+    info!("{:?} Initializing RTC!", file!());
     init(p.RTC);
+    info!("{:?} RTC init at time {}!", file!(), get_ticks().and_utc().timestamp_millis());
 
     // Set up a heartbeat LED to we know we're still working
     info!("{:?} Initializing heartbeat!", file!());

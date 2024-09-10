@@ -14,7 +14,7 @@ use micropb::{
     // heapless::Vec,
     MessageEncode, PbEncoder,
 };
-use crate::utils::rtc_read::get_ticks;
+use crate::utils::rtc_read::get_ticks_since_boot;
 use crate::tasks::accel_mon::ACCEL;
 
 mod proto {
@@ -121,12 +121,13 @@ async fn stream_telem<'d, T: Instance + 'd>(class: &mut CdcAcmClass<'d, Driver<'
     }
 }
 fn construct_telem() -> Accel {
-    let now = get_ticks();
+    let now = get_ticks_since_boot();
+    info!("now: {}", now);
     let accel_data = ACCEL.lock(|f| {
         return f.clone().unwrap();
     });
     let data = Accel {
-            time: now.and_utc().timestamp_millis(),
+            time: now,
             x_accel: accel_data.x,
             y_accel: accel_data.y,
             z_accel: accel_data.z,
