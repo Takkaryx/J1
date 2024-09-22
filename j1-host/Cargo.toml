@@ -1,0 +1,12 @@
+[package]
+name = "j1-host"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rusb = "0.9.4"
+micropb = "0.1"
+
+[build-dependencies]
+# Allow types from `heapless` to be used for container fields
+micropb-gen = { version = "0.1" }
