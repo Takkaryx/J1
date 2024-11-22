@@ -14,20 +14,30 @@ use tasks::usb::usb_task;
 use utils::button_mon::{ButtonMon, button_task};
 use utils::rtc_read::{get_ticks, init};
 
+use embedded_io_async::BufRead;
 use embassy_executor::Spawner;
 use static_cell::StaticCell;
 use embassy_embedded_hal::shared_bus::asynch::spi::SpiDevice;
 use embassy_sync::mutex::Mutex;
 use embassy_sync::blocking_mutex::raw::NoopRawMutex;
-use embassy_stm32::exti::Channel;
-use embassy_stm32::peripherals::{DMA2_CH3, DMA2_CH2, SPI1};
-use embassy_stm32::gpio::{Pin, Level, Output, Speed};
-use embassy_stm32::spi::{Config as SpiConfig, Spi};
-use embassy_stm32::{Config as Stm32_Config, spi};
-use embassy_stm32::time::Hertz;
+use embassy_stm32::{
+    bind_interrupts,
+    exti::Channel,
+    peripherals::{self, DMA2_CH3, DMA2_CH2, SPI1},
+    gpio::{Pin, Level, Output, Speed},
+    spi::{Config as SpiConfig, Spi},
+    {Config as Stm32_Config, spi},
+    time::Hertz,
+    usart::{self, Config as Usart_Config, BufferedUart},
+};
 use panic_halt as _;
 use defmt::*;
 use defmt_rtt as _;
+
+bind_interrupts!(struct Irqs {
+    USART1 => usart::BufferedInterruptHandler<peripherals::USART1>;
+});
+
 
 #[embassy_executor::main]
 async fn main(spawner: Spawner) {
@@ -98,5 +108,20 @@ async fn main(spawner: Spawner) {
 
     info!("{:?} Initializing USB", file!());
     spawner.must_spawn(usb_task(p.USB_OTG_FS, p.PA12, p.PA11));
+
+    let uart_config = Usart_Config::default();
+    let mut tx_buf = [0u8; 32];
+    let mut rx_buf = [0u8; 32];
+
+    let mut buf_usart = BufferedUart::new(p.USART1, Irqs, p.PA10, p.PA9, &mut tx_buf, &mut rx_buf, uart_config).unwrap();
+
+    loop {
+        let buf = buf_usart.fill_buf().await.unwrap();
+        info!("Received: {}", buf);
+
+        // Read bytes have to be explicitly consumed, otherwise fill_buf() will return them again
+        let n = buf.len();
+        buf_usart.consume(n);
+    }
 }
     

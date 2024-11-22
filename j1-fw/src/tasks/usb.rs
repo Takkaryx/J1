@@ -45,7 +45,7 @@ pub async fn usb_task(usb_dev: USB_OTG_FS, pin1: PA12, pin2: PA11) {
     let mut config = embassy_usb::Config::new(0xcafe, 0xc0de);
     config.manufacturer = Some("J1 USB");
     config.product = Some("Accelerometer_Prototype");
-    config.serial_number = Some("12345678");
+    config.serial_number = Some("100");
 
     // Required for windows compatibility.
     // https://developer.nordicsemi.com/nRF_Connect_SDK/doc/1.9.1/kconfig/CONFIG_CDC_ACM_IAD.html#help

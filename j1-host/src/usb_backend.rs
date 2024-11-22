@@ -1,5 +1,5 @@
 use rusb::{
-    devices, Context, Device, DeviceDescriptor, DeviceHandle, Direction, Result, TransferType,
+    Device, DeviceDescriptor, DeviceHandle, Direction, HotplugBuilder, Result, TransferType,
     UsbContext,
 };
 use std::time::Duration;
@@ -10,6 +10,48 @@ struct Endpoint {
     iface: u8,
     setting: u8,
     address: u8,
+}
+
+struct HotPlugHandler;
+
+impl<T: UsbContext> rusb::Hotplug<T> for HotPlugHandler {
+    fn device_arrived(&mut self, device: Device<T>) {
+        println!("Device arrived {:?}", device);
+    }
+
+    fn device_left(&mut self, device: Device<T>) {
+        println!("device left {:?}", device);
+    }
+}
+
+impl Drop for HotPlugHandler {
+    fn drop(&mut self) {
+        println!("HotPlugHandler dropped!");
+    }
+}
+
+pub fn setup_hotplug() -> rusb::Result<()> {
+    if rusb::has_hotplug() {
+        let context = rusb::Context::new()?;
+
+        let mut reg = Some(
+            HotplugBuilder::new()
+                .enumerate(true)
+                .register(&context, Box::new(HotPlugHandler {}))?,
+        );
+
+        loop {
+            context.handle_events(None).unwrap();
+            if let Some(reg) = reg.take() {
+                context.unregister_callback(reg);
+                break;
+            }
+        }
+        Ok(())
+    } else {
+        eprint!("libusb hotplug not supported");
+        Ok(())
+    }
 }
 
 pub fn open_device<T: UsbContext>(
@@ -74,14 +116,24 @@ pub fn read_device<T: UsbContext>(
         );
     }
 
-    // match find_readable_endpoint(device, device_desc, TransferType::Interrupt) {
-    //     Some(endpoint) => read_endpoint(handle, endpoint, TransferType::Interrupt),
-    //     None => println!("No readable interrupt endpoint"),
-    // }
+    match find_readable_endpoint(device, device_desc, TransferType::Interrupt) {
+        Some(endpoint) => read_endpoint(handle, endpoint, TransferType::Interrupt),
+        None => println!("No readable interrupt endpoint"),
+    }
 
     match find_readable_endpoint(device, device_desc, TransferType::Bulk) {
         Some(endpoint) => read_endpoint(handle, endpoint, TransferType::Bulk),
         None => println!("No readable bulk endpoint"),
+    }
+
+    match find_readable_endpoint(device, device_desc, TransferType::Control) {
+        Some(endpoint) => read_endpoint(handle, endpoint, TransferType::Bulk),
+        None => println!("No readable control endpoint"),
+    }
+
+    match find_readable_endpoint(device, device_desc, TransferType::Isochronous) {
+        Some(endpoint) => read_endpoint(handle, endpoint, TransferType::Bulk),
+        None => println!("No readable IsoChronous endpoint"),
     }
 
     Ok(())
@@ -139,7 +191,7 @@ fn read_endpoint<T: UsbContext>(
     match configure_endpoint(handle, &endpoint) {
         Ok(_) => {
             let mut buf = [0; 256];
-            let timeout = Duration::from_secs(1);
+            let timeout = Duration::from_secs(5);
 
             match transfer_type {
                 TransferType::Interrupt => {
